@@ -75,7 +75,7 @@ impl Int256 {
 #[derivative(Debug, Clone, PartialEq)]
 pub struct BlockId {
     pub workchain: i32,
-    pub shard: u64,
+    pub shard: i64,
     pub seqno: u32,
 }
 
@@ -84,7 +84,7 @@ pub struct BlockId {
 #[derivative(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BlockIdExt {
     pub workchain: i32,
-    pub shard: u64,
+    pub shard: i64,
     pub seqno: u32,
     pub root_hash: Int256,
     pub file_hash: Int256,
