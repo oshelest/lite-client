@@ -199,6 +199,15 @@ impl FromResponse for BlockTransactions {
     }
 }
 
+impl FromResponse for BlockTransactionsExt {
+    fn from_response(response: Response) -> Result<Self, LiteError> {
+        match response {
+            Response::BlockTransactionsExt(s) => Ok(s),
+            _ => Err(LiteError::UnexpectedMessage)
+        }
+    }
+}
+
 impl FromResponse for PartialBlockProof {
     fn from_response(response: Response) -> Result<Self, LiteError> {
         match response {

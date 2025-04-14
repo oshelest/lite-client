@@ -187,6 +187,26 @@ pub async fn list_block_transactions(
         Ok(response)
     }
 
+    pub async fn list_block_transactions_ext(
+        &mut self,
+        id: BlockIdExt,
+        count: u32,
+        after: Option<TransactionId3>,
+        reverse_order: bool,
+        want_proof: bool
+    ) -> Result<BlockTransactionsExt> {
+        let request = Request::ListBlockTransactionsExt(ListBlockTransactions {
+            id,
+            mode: (),
+            count,
+            after,
+            reverse_order: if reverse_order { Some(()) } else { None },
+            want_proof: if want_proof { Some(()) } else { None },
+        });
+            let response: BlockTransactionsExt = self.send_request(request).await?;
+            Ok(response)
+        }
+
 pub async fn get_block_proof(
     &mut self,
     known_block: BlockIdExt,

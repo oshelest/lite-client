@@ -45,7 +45,7 @@ pub struct Version {
 #[derivative(Debug, Clone, PartialEq)]
 pub struct BlockData {
     pub id: BlockIdExt,
-    #[derivative(Debug(format_with="fmt_bytes"))]
+    #[derivative(Debug(format_with = "fmt_bytes"))]
     pub data: Vec<u8>,
 }
 
@@ -55,7 +55,7 @@ pub struct BlockState {
     pub id: BlockIdExt,
     pub root_hash: Int256,
     pub file_hash: Int256,
-    #[derivative(Debug(format_with="fmt_bytes"))]
+    #[derivative(Debug(format_with = "fmt_bytes"))]
     pub data: Vec<u8>,
 }
 
@@ -75,7 +75,7 @@ pub struct BlockHeader {
     pub with_shard_hashes: Option<()>,
     #[tl(flags_bit = "mode.6")]
     pub with_prev_blk_signatures: Option<()>,
-    #[derivative(Debug(format_with="fmt_bytes"))]
+    #[derivative(Debug(format_with = "fmt_bytes"))]
     pub header_proof: Vec<u8>,
 }
 
@@ -106,23 +106,23 @@ pub struct RunMethodResult {
     pub id: BlockIdExt,
     pub shardblk: BlockIdExt,
     #[tl(flags_bit = "mode.0")]
-    #[derivative(Debug(format_with="fmt_opt_bytes"))] 
+    #[derivative(Debug(format_with = "fmt_opt_bytes"))]
     pub shard_proof: Option<Vec<u8>>,
     #[tl(flags_bit = "mode.0")]
-    #[derivative(Debug(format_with="fmt_opt_bytes"))] 
+    #[derivative(Debug(format_with = "fmt_opt_bytes"))]
     pub proof: Option<Vec<u8>>,
     #[tl(flags_bit = "mode.1")]
-    #[derivative(Debug(format_with="fmt_opt_bytes"))] 
+    #[derivative(Debug(format_with = "fmt_opt_bytes"))]
     pub state_proof: Option<Vec<u8>>,
     #[tl(flags_bit = "mode.3")]
-    #[derivative(Debug(format_with="fmt_opt_bytes"))] 
+    #[derivative(Debug(format_with = "fmt_opt_bytes"))]
     pub init_c7: Option<Vec<u8>>,
     #[tl(flags_bit = "mode.4")]
-    #[derivative(Debug(format_with="fmt_opt_bytes"))] 
+    #[derivative(Debug(format_with = "fmt_opt_bytes"))]
     pub lib_extras: Option<Vec<u8>>,
     pub exit_code: i32,
     #[tl(flags_bit = "mode.2")]
-    #[derivative(Debug(format_with="fmt_opt_bytes"))] 
+    #[derivative(Debug(format_with = "fmt_opt_bytes"))]
     pub result: Option<Vec<u8>>,
 }
 
@@ -470,6 +470,10 @@ pub enum Response {
     /// liteServer.blockTransactions id:tonNode.blockIdExt req_count:# incomplete:Bool ids:(vector liteServer.transactionId) proof:bytes = liteServer.BlockTransactions;
     #[tl(id = 0xbd8cad2b)]
     BlockTransactions(BlockTransactions),
+
+    /// liteServer.blockTransactionsExt id:tonNode.blockIdExt req_count:# incomplete:Bool transactions:bytes proof:bytes = liteServer.BlockTransactionsExt;
+    #[tl(id = 0xfb8ffce4)]
+    BlockTransactionsExt(BlockTransactionsExt),
 
     /// liteServer.partialBlockProof complete:Bool from:tonNode.blockIdExt to:tonNode.blockIdExt steps:(vector liteServer.BlockLink) = liteServer.PartialBlockProof;
     #[tl(id = 0x8ed0d2c1)]
