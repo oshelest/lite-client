@@ -23,6 +23,7 @@ tokio-tower = "0.6.0"
 rand = "0.8.5"
 futures = "0.3"
 pin-project = "1"
+crc16 = "0.4.0"
 
 [dev-dependencies]
 ureq = "2.4.0"
