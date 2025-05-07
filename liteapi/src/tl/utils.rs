@@ -1,5 +1,5 @@
 use crc16::State;
-use crc16::X_25;
+use crc16::XMODEM;
 use tl_proto::{TlRead, TlResult};
 
 use crate::types::LiteError;
@@ -21,8 +21,8 @@ pub fn lossy_read<'tl, T: TlRead<'tl>>(
 }
 
 pub fn method_id(method: &str) -> u64 {
-    let crc: u16 = State::<X_25>::calculate(method.as_bytes());
-    (u64::from(crc & 0xffff)) | 0x10000
+    let crc: u16 = State::<XMODEM>::calculate(method.as_bytes());
+    u64::from(crc) | 0x10000
 }
 
 pub fn fmt_string(bytes: &[u8], f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
