@@ -124,6 +124,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-trait"
+version = "0.1.88"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e539d3fca749fcee5236ab05e93a52867dd549cc157c8cb7f99595f3cedffdb5"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.101",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1748,6 +1759,7 @@ name = "ton_liteapi"
 version = "0.2.0"
 dependencies = [
  "adnl",
+ "async-trait",
  "base64 0.13.1",
  "crc16",
  "derivative",

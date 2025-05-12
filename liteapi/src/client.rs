@@ -1,4 +1,5 @@
 use adnl::AdnlPeer;
+use std::fmt::Display;
 use tokio::net::ToSocketAddrs;
 use tokio_tower::multiplex;
 use tower::{Service as _, ServiceBuilder, ServiceExt as _};
@@ -12,86 +13,223 @@ use crate::{
 
 type Result<T> = std::result::Result<T, LiteError>;
 
+#[async_trait::async_trait]
+pub trait LiteClientTrait {
+    async fn connect<A: ToSocketAddrs + Send + Clone + Display + 'static>(
+        address: A,
+        public_key: impl AsRef<[u8]> + Send + Clone + 'static,
+    ) -> Result<Self>
+    where
+        Self: Sized;
+
+    fn wait_masterchain_seqno(self, seqno: u32) -> Self
+    where
+        Self: Sized;
+    fn set_wait_masterchain_seqno(&mut self, seqno: u32);
+
+    async fn reconnect(&mut self) -> Result<()>;
+
+    async fn get_masterchain_info(&mut self) -> Result<MasterchainInfo>;
+    async fn get_masterchain_info_ext(&mut self, mode: u32) -> Result<MasterchainInfoExt>;
+    async fn get_time(&mut self) -> Result<u32>;
+    async fn get_version(&mut self) -> Result<Version>;
+    async fn get_block(&mut self, id: BlockIdExt) -> Result<Vec<u8>>;
+    async fn get_state(&mut self, id: BlockIdExt) -> Result<BlockState>;
+    async fn get_block_header(
+        &mut self,
+        id: BlockIdExt,
+        with_state_update: bool,
+        with_value_flow: bool,
+        with_extra: bool,
+        with_shard_hashes: bool,
+        with_prev_blk_signatures: bool,
+    ) -> Result<Vec<u8>>;
+    async fn send_message(&mut self, body: Vec<u8>) -> Result<u32>;
+    async fn get_account_state(
+        &mut self,
+        id: BlockIdExt,
+        account: AccountId,
+    ) -> Result<AccountState>;
+    async fn run_smc_method(
+        &mut self,
+        mode: u32,
+        id: BlockIdExt,
+        account: AccountId,
+        method_id: u64,
+        params: Vec<u8>,
+    ) -> Result<RunMethodResult>;
+    async fn get_shard_info(
+        &mut self,
+        id: BlockIdExt,
+        workchain: i32,
+        shard: u64,
+        exact: bool,
+    ) -> Result<ShardInfo>;
+    async fn get_all_shards_info(&mut self, id: BlockIdExt) -> Result<AllShardsInfo>;
+    async fn get_one_transaction(
+        &mut self,
+        id: BlockIdExt,
+        account: AccountId,
+        lt: u64,
+    ) -> Result<TransactionInfo>;
+    async fn get_transactions(
+        &mut self,
+        count: u32,
+        account: AccountId,
+        lt: u64,
+        hash: Int256,
+    ) -> Result<TransactionList>;
+    async fn lookup_block(
+        &mut self,
+        mode: (),
+        id: BlockId,
+        seqno: Option<()>,
+        lt: Option<u64>,
+        utime: Option<u32>,
+        with_state_update: bool,
+        with_value_flow: bool,
+        with_extra: bool,
+        with_shard_hashes: bool,
+        with_prev_blk_signatures: bool,
+    ) -> Result<BlockHeader>;
+    async fn list_block_transactions(
+        &mut self,
+        id: BlockIdExt,
+        count: u32,
+        after: Option<TransactionId3>,
+        reverse_order: bool,
+        want_proof: bool,
+    ) -> Result<BlockTransactions>;
+    async fn list_block_transactions_ext(
+        &mut self,
+        id: BlockIdExt,
+        count: u32,
+        after: Option<TransactionId3>,
+        reverse_order: bool,
+        want_proof: bool,
+    ) -> Result<BlockTransactionsExt>;
+    async fn get_block_proof(
+        &mut self,
+        known_block: BlockIdExt,
+        target_block: Option<BlockIdExt>,
+        allow_weak_target: bool,
+        base_block_from_request: bool,
+    ) -> Result<PartialBlockProof>;
+    async fn get_config_all(
+        &mut self,
+        id: BlockIdExt,
+        with_state_root: bool,
+        with_libraries: bool,
+        with_state_extra_root: bool,
+        with_shard_hashes: bool,
+        with_validator_set: bool,
+        with_special_smc: bool,
+        with_accounts_root: bool,
+        with_prev_blocks: bool,
+        with_workchain_info: bool,
+        with_capabilities: bool,
+        extract_from_key_block: bool,
+    ) -> Result<ConfigInfo>;
+    async fn get_config_params(
+        &mut self,
+        id: BlockIdExt,
+        param_list: Vec<i32>,
+        with_state_root: bool,
+        with_libraries: bool,
+        with_state_extra_root: bool,
+        with_shard_hashes: bool,
+        with_validator_set: bool,
+        with_special_smc: bool,
+        with_accounts_root: bool,
+        with_prev_blocks: bool,
+        with_workchain_info: bool,
+        with_capabilities: bool,
+        extract_from_key_block: bool,
+    ) -> Result<ConfigInfo>;
+    async fn get_validator_stats(
+        &mut self,
+        id: BlockIdExt,
+        limit: u32,
+        start_after: Option<Int256>,
+        modified_after: Option<u32>,
+    ) -> Result<ValidatorStats>;
+    async fn get_libraries(&mut self, library_list: Vec<Int256>) -> Result<Vec<LibraryEntry>>;
+}
+
 pub struct LiteClient {
     inner: tower::util::BoxService<WrappedRequest, Response, LiteError>,
     wait_seqno: Option<u32>,
+    address: std::string::String,
+    pubkey: Vec<u8>,
 }
 
-impl LiteClient {
-    pub async fn connect<A: ToSocketAddrs>(
+#[async_trait::async_trait]
+impl LiteClientTrait for LiteClient {
+    async fn connect<A: ToSocketAddrs + Send + Display + Clone + 'static>(
         address: A,
-        public_key: impl AsRef<[u8]>,
-    ) -> Result<Self> {
-        let adnl = AdnlPeer::connect(public_key, address).await?;
-        let lite = LitePeer::new(adnl);
-        let service = ServiceBuilder::new()
-            .layer(UnwrapErrorLayer)
-            .layer(WrapMessagesLayer)
-            .service(multiplex::Client::<
-                _,
-                Box<dyn std::error::Error + Send + Sync + 'static>,
-                _,
-            >::new(lite));
+        public_key: impl AsRef<[u8]> + Send + Clone + 'static,
+    ) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let service = Self::create_service(address.clone(), public_key.clone()).await?;
         Ok(Self {
-            inner: service.boxed(),
+            inner: service,
             wait_seqno: None,
+            address: address.to_string(),
+            pubkey: public_key.as_ref().to_vec(),
         })
     }
 
-    pub fn wait_masterchain_seqno(mut self, seqno: u32) -> Self {
+    fn wait_masterchain_seqno(mut self, seqno: u32) -> Self {
         self.wait_seqno = Some(seqno);
         self
     }
 
-    pub fn set_wait_masterchain_seqno(&mut self, seqno: u32) {
+    fn set_wait_masterchain_seqno(&mut self, seqno: u32) {
         self.wait_seqno = Some(seqno);
     }
 
-    async fn send_request<T: FromResponse>(&mut self, request: Request) -> Result<T> {
-        let wrapped_request = WrappedRequest {
-            wait_masterchain_seqno: self.wait_seqno.take().map(|seqno| WaitMasterchainSeqno {
-                seqno,
-                timeout_ms: 10000,
-            }),
-            request: request.into(),
-        };
-        T::from_response(self.inner.ready().await?.call(wrapped_request).await?)
+    async fn reconnect(&mut self) -> Result<()> {
+        let service = Self::create_service(self.address.clone(), self.pubkey.clone()).await?;
+        self.inner = service;
+        Ok(())
     }
 
-    pub async fn get_masterchain_info(&mut self) -> Result<MasterchainInfo> {
+    async fn get_masterchain_info(&mut self) -> Result<MasterchainInfo> {
         let response: MasterchainInfo = self.send_request(Request::GetMasterchainInfo).await?;
         Ok(response)
     }
 
-    pub async fn get_masterchain_info_ext(&mut self, mode: u32) -> Result<MasterchainInfoExt> {
+    async fn get_masterchain_info_ext(&mut self, mode: u32) -> Result<MasterchainInfoExt> {
         let request = Request::GetMasterchainInfoExt(GetMasterchainInfoExt { mode });
         let response: MasterchainInfoExt = self.send_request(request).await?;
         Ok(response)
     }
 
-    pub async fn get_time(&mut self) -> Result<u32> {
+    async fn get_time(&mut self) -> Result<u32> {
         let response: CurrentTime = self.send_request(Request::GetTime).await?;
         Ok(response.now)
     }
 
-    pub async fn get_version(&mut self) -> Result<Version> {
+    async fn get_version(&mut self) -> Result<Version> {
         let response: Version = self.send_request(Request::GetVersion).await?;
         Ok(response)
     }
 
-    pub async fn get_block(&mut self, id: BlockIdExt) -> Result<Vec<u8>> {
+    async fn get_block(&mut self, id: BlockIdExt) -> Result<Vec<u8>> {
         let request = Request::GetBlock(GetBlock { id });
         let response: BlockData = self.send_request(request).await?;
         Ok(response.data)
     }
 
-    pub async fn get_state(&mut self, id: BlockIdExt) -> Result<BlockState> {
+    async fn get_state(&mut self, id: BlockIdExt) -> Result<BlockState> {
         let request = Request::GetState(GetState { id });
         let response: BlockState = self.send_request(request).await?;
         Ok(response)
     }
 
-    pub async fn get_block_header(
+    async fn get_block_header(
         &mut self,
         id: BlockIdExt,
         with_state_update: bool,
@@ -117,13 +255,13 @@ impl LiteClient {
         Ok(response.header_proof)
     }
 
-    pub async fn send_message(&mut self, body: Vec<u8>) -> Result<u32> {
+    async fn send_message(&mut self, body: Vec<u8>) -> Result<u32> {
         let request = Request::SendMessage(SendMessage { body });
         let response: SendMsgStatus = self.send_request(request).await?;
         Ok(response.status)
     }
 
-    pub async fn get_account_state(
+    async fn get_account_state(
         &mut self,
         id: BlockIdExt,
         account: AccountId,
@@ -133,7 +271,7 @@ impl LiteClient {
         Ok(response)
     }
 
-    pub async fn run_smc_method(
+    async fn run_smc_method(
         &mut self,
         mode: u32,
         id: BlockIdExt,
@@ -152,7 +290,7 @@ impl LiteClient {
         Ok(response)
     }
 
-    pub async fn get_shard_info(
+    async fn get_shard_info(
         &mut self,
         id: BlockIdExt,
         workchain: i32,
@@ -169,13 +307,13 @@ impl LiteClient {
         Ok(response)
     }
 
-    pub async fn get_all_shards_info(&mut self, id: BlockIdExt) -> Result<AllShardsInfo> {
+    async fn get_all_shards_info(&mut self, id: BlockIdExt) -> Result<AllShardsInfo> {
         let request = Request::GetAllShardsInfo(GetAllShardsInfo { id });
         let response: AllShardsInfo = self.send_request(request).await?;
         Ok(response)
     }
 
-    pub async fn get_one_transaction(
+    async fn get_one_transaction(
         &mut self,
         id: BlockIdExt,
         account: AccountId,
@@ -186,7 +324,7 @@ impl LiteClient {
         Ok(response)
     }
 
-    pub async fn get_transactions(
+    async fn get_transactions(
         &mut self,
         count: u32,
         account: AccountId,
@@ -203,7 +341,7 @@ impl LiteClient {
         Ok(response)
     }
 
-    pub async fn lookup_block(
+    async fn lookup_block(
         &mut self,
         mode: (),
         id: BlockId,
@@ -236,7 +374,7 @@ impl LiteClient {
         Ok(response)
     }
 
-    pub async fn list_block_transactions(
+    async fn list_block_transactions(
         &mut self,
         id: BlockIdExt,
         count: u32,
@@ -256,7 +394,7 @@ impl LiteClient {
         Ok(response)
     }
 
-    pub async fn list_block_transactions_ext(
+    async fn list_block_transactions_ext(
         &mut self,
         id: BlockIdExt,
         count: u32,
@@ -276,7 +414,7 @@ impl LiteClient {
         Ok(response)
     }
 
-    pub async fn get_block_proof(
+    async fn get_block_proof(
         &mut self,
         known_block: BlockIdExt,
         target_block: Option<BlockIdExt>,
@@ -298,7 +436,7 @@ impl LiteClient {
         Ok(response)
     }
 
-    pub async fn get_config_all(
+    async fn get_config_all(
         &mut self,
         id: BlockIdExt,
         with_state_root: bool,
@@ -340,7 +478,7 @@ impl LiteClient {
         Ok(response)
     }
 
-    pub async fn get_config_params(
+    async fn get_config_params(
         &mut self,
         id: BlockIdExt,
         param_list: Vec<i32>,
@@ -384,7 +522,7 @@ impl LiteClient {
         Ok(response)
     }
 
-    pub async fn get_validator_stats(
+    async fn get_validator_stats(
         &mut self,
         id: BlockIdExt,
         limit: u32,
@@ -402,9 +540,39 @@ impl LiteClient {
         Ok(response)
     }
 
-    pub async fn get_libraries(&mut self, library_list: Vec<Int256>) -> Result<Vec<LibraryEntry>> {
+    async fn get_libraries(&mut self, library_list: Vec<Int256>) -> Result<Vec<LibraryEntry>> {
         let request = Request::GetLibraries(GetLibraries { library_list });
         let response: LibraryResult = self.send_request(request).await?;
         Ok(response.result)
+    }
+}
+
+impl LiteClient {
+    async fn create_service<A: ToSocketAddrs + Send + Display + Clone + 'static>(
+        address: A,
+        public_key: impl AsRef<[u8]> + Send + Clone + 'static,
+    ) -> Result<tower::util::BoxService<WrappedRequest, Response, LiteError>> {
+        let adnl = AdnlPeer::connect(public_key.clone(), address.clone()).await?;
+        let lite = LitePeer::new(adnl);
+        let service = ServiceBuilder::new()
+            .layer(UnwrapErrorLayer)
+            .layer(WrapMessagesLayer)
+            .service(multiplex::Client::<
+                _,
+                Box<dyn std::error::Error + Send + Sync + 'static>,
+                _,
+            >::new(lite));
+        Ok(service.boxed())
+    }
+
+    async fn send_request<T: FromResponse>(&mut self, request: Request) -> Result<T> {
+        let wrapped_request = WrappedRequest {
+            wait_masterchain_seqno: self.wait_seqno.take().map(|seqno| WaitMasterchainSeqno {
+                seqno,
+                timeout_ms: 10000,
+            }),
+            request: request.into(),
+        };
+        T::from_response(self.inner.ready().await?.call(wrapped_request).await?)
     }
 }
