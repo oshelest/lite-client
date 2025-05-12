@@ -14,9 +14,8 @@ use crate::{
 type Result<T> = std::result::Result<T, LiteError>;
 
 #[async_trait::async_trait]
-#[cfg_attr(test, mockall::automock)]
+#[cfg_attr(feature = "mockall", mockall::automock)]
 pub trait LiteClientTrait {
-
     fn wait_masterchain_seqno(self, seqno: u32) -> Self
     where
         Self: Sized;
