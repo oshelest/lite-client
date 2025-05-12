@@ -14,13 +14,8 @@ use crate::{
 type Result<T> = std::result::Result<T, LiteError>;
 
 #[async_trait::async_trait]
+#[cfg_attr(test, mockall::automock)]
 pub trait LiteClientTrait {
-    async fn connect<A: ToSocketAddrs + Send + Clone + Display + 'static>(
-        address: A,
-        public_key: impl AsRef<[u8]> + Send + Clone + 'static,
-    ) -> Result<Self>
-    where
-        Self: Sized;
 
     fn wait_masterchain_seqno(self, seqno: u32) -> Self
     where
@@ -165,22 +160,6 @@ pub struct LiteClient {
 
 #[async_trait::async_trait]
 impl LiteClientTrait for LiteClient {
-    async fn connect<A: ToSocketAddrs + Send + Display + Clone + 'static>(
-        address: A,
-        public_key: impl AsRef<[u8]> + Send + Clone + 'static,
-    ) -> Result<Self>
-    where
-        Self: Sized,
-    {
-        let service = Self::create_service(address.clone(), public_key.clone()).await?;
-        Ok(Self {
-            inner: service,
-            wait_seqno: None,
-            address: address.to_string(),
-            pubkey: public_key.as_ref().to_vec(),
-        })
-    }
-
     fn wait_masterchain_seqno(mut self, seqno: u32) -> Self {
         self.wait_seqno = Some(seqno);
         self
@@ -548,6 +527,25 @@ impl LiteClientTrait for LiteClient {
 }
 
 impl LiteClient {
+    pub async fn connect<
+        A: ToSocketAddrs + Send + Clone + Display + 'static,
+        P: AsRef<[u8]> + Send + Clone + 'static,
+    >(
+        address: A,
+        public_key: P,
+    ) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let service = Self::create_service(address.clone(), public_key.clone()).await?;
+        Ok(Self {
+            inner: service,
+            wait_seqno: None,
+            address: address.to_string(),
+            pubkey: public_key.as_ref().to_vec(),
+        })
+    }
+
     async fn create_service<A: ToSocketAddrs + Send + Display + Clone + 'static>(
         address: A,
         public_key: impl AsRef<[u8]> + Send + Clone + 'static,

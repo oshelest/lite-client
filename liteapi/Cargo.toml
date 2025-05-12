@@ -9,6 +9,10 @@ categories = ["network-programming"]
 license = "MIT"
 authors = ["Vladimir Lebedev <d3fl4t3@gmail.com>"]
 
+[features]
+default = []
+mocks = ["mockall"]
+
 [dependencies]
 adnl = "2.0.0"
 tl-proto = { version = "0.4", features = ["bytes"] }
@@ -25,6 +29,7 @@ futures = "0.3"
 pin-project = "1"
 crc16 = "0.4.0"
 async-trait = "0.1"
+mockall = { version = "0.12", optional = true }
 
 [dev-dependencies]
 ureq = "2.4.0"
@@ -32,3 +37,4 @@ base64 = "0.13.0"
 x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
 tokio = { version = "1.36", features = ["full"] }
 env_logger = "0.11.3"
+mockall = "0.12"
