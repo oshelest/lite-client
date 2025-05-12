@@ -12,9 +12,11 @@ use crate::{
 };
 
 type Result<T> = std::result::Result<T, LiteError>;
+#[cfg(feature = "mocks")]
+use mockall::automock;
 
 #[async_trait::async_trait]
-#[cfg_attr(test, mockall::automock)]
+#[cfg_attr(feature = "mocks", automock)]
 pub trait LiteClientTrait {
     fn wait_masterchain_seqno(self, seqno: u32) -> Self
     where
@@ -573,3 +575,6 @@ impl LiteClient {
         T::from_response(self.inner.ready().await?.call(wrapped_request).await?)
     }
 }
+
+#[cfg(feature = "mocks")]
+pub use MockLiteClientTrait;
