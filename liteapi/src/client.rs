@@ -575,6 +575,3 @@ impl LiteClient {
         T::from_response(self.inner.ready().await?.call(wrapped_request).await?)
     }
 }
-
-#[cfg(feature = "mocks")]
-pub use MockLiteClientTrait;
